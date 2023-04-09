@@ -10,8 +10,22 @@ dockerfile = "./tmp_docker/Dockerfile.x86_64-linux-android"
 [target.i686-linux-android]
 dockerfile = "./tmp_docker/Dockerfile.i686-linux-android"
 
-[target.aarch64-linux-android]
-dockerfile = "./tmp_docker/Dockerfile.aarch64-linux-android"
+
+#[target.aarch64-linux-android]
+#image = "cross-custom-indy-vdr:aarch64-linux-android-98066"
+
+[target.aarch64-linux-android.dockerfile]
+file = "./cross/docker/Dockerfile.aarch64-linux-android"
+context = "./cross/docker" 
+# ANDROID_NDK version from https://github.com/android/ndk/wiki
+# ANDROID_VERSION from https://android.googlesource.com/platform/manifest/+refs
+#build-args = { ANDROID_NDK = "r25b", ANDROID_SDK = "28", ANDROID_VERSION="9.0.0_r1" }
+#build-args = { ANDROID_NDK = "r25b", ANDROID_SDK = "23", ANDROID_VERSION="6.0.1_r81" }
+#build-args = { ANDROID_NDK = "r21d", ANDROID_SDK = "26", ANDROID_VERSION="8.0.0_r51" }
+#build-args = { ANDROID_NDK = "r21d", ANDROID_SDK = "24", ANDROID_VERSION="7.0.0_r36" }
+build-args = { ANDROID_NDK = "r21d", ANDROID_SDK = "23", ANDROID_VERSION="6.0.1_r81" }
+#build-args = { ANDROID_NDK = "10e", ANDROID_SDK = "21", ANDROID_VERSION="5.0.0_r1" }
+#build-args = { ANDROID_NDK = "r21e", ANDROID_SDK = "22", ANDROID_VERSION="5.1.1_r9" }
 
 [target.armv7-linux-androideabi]
 dockerfile = "./tmp_docker/Dockerfile.armv7-linux-androideabi"

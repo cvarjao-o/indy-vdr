@@ -1,0 +1,90 @@
+name: "Android"
+
+env:
+  RUST_VERSION: "1.63.0"
+  CROSS_VERSION: "0.2.4"
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish-binaries:
+        description: "Publish Binaries to Release (will create a release if no release exits for branch or tag)"
+        required: true
+        default: false
+        type: boolean
+      publish-wrappers:
+        description: "Publish Wrappers to Registries"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  checks:
+    name: Run checks
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: clippy, rustfmt
+
+      - name: Cache cargo resources
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: deps
+          cache-on-failure: true
+
+      - name: Cargo check
+        run: cargo check
+
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+
+      - if: "runner.os == 'Linux'"
+        name: Pre-install cross
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+  build-android:
+    name: Build library (Android)
+    needs: [checks]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          [
+            aarch64-linux-android,
+            armv7-linux-androideabi,
+            i686-linux-android,
+            x86_64-linux-android,
+          ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Checkout Cross
+        uses: actions/checkout@v3
+        with:
+          repository: cross-rs/cross
+          path: cross
+
+      - name: Build
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          cross build --release --target ${{matrix.target}} --package indy-vdr
+
+      - name: Save library
+        uses: actions/upload-artifact@v3
+        with:
+          name: library-${{matrix.target}}
+          path: target/${{ matrix.target }}/release/libindy_vdr.so
+
