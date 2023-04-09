@@ -1,0 +1,10 @@
+[build]
+passthrough = ["ANDROID_NDK=r21e", "ANDROID_SDK=23", "ANDROID_VERSION=6.0.1_r81"]
+## workaround
+## https://blog.rust-lang.org/2023/01/09/android-ndk-update-r25.html
+## https://github.com/rust-lang/rust/pull/85806#issuecomment-1096266946
+#pre-build = [
+#    "rustc --version",
+#    "cargo --version",
+#    "find ~ -name 'libunwind.a' | sed 's@libunwind.a$@libgcc.a@' | while read x; do echo 'INPUT(-lunwind)' > $x; done",
+#]

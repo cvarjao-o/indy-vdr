@@ -1,0 +1,123 @@
+name: "Cross Images"
+
+env:
+  RUST_VERSION: "1.67.0"
+  CROSS_VERSION: "0.2.4"
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_IMAGE_NAME: ${{ github.repository }}
+  DOCKER_DEFAULT_PLATFORM: "linux/amd64"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: Run checks
+    strategy:
+      matrix:
+        os: [ubuntu-20.04]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: clippy, rustfmt
+
+#      - name: Cache cargo resources
+#        uses: Swatinem/rust-cache@v2
+#        with:
+#          shared-key: deps
+#          cache-on-failure: true
+
+#      - name: Cargo check
+#        run: cargo check
+
+#      - name: Cargo fmt
+#        run: cargo fmt --all -- --check
+
+#      - if: "runner.os == 'Linux'"
+#        name: Pre-install cross
+#        run: |
+#          cargo install cross --git https://github.com/cross-rs/cross
+
+  build-cross:
+    name: Build
+    needs: [checks]
+    runs-on: ubuntu-20.04
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        target:
+          [
+            aarch64-linux-android,
+            armv7-linux-androideabi,
+            i686-linux-android,
+            x86_64-linux-android,
+          ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: rustup default
+        run: rustup default ${{ env.RUST_VERSION }}
+
+      - name: Checkout Cross
+        uses: actions/checkout@v3
+        with:
+          repository: cross-rs/cross
+          path: cross
+
+      - name: git patch (cross)
+        run: git apply ../patches/cross.patch
+        working-directory: ./cross
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/indy-vdr-cross-${{matrix.target}}
+          flavor: latest=true
+
+      - name: Configure Android/NDK/SDK
+        working-directory: ./cross
+        run: |
+          find ./docker -type f -name 'Dockerfile.*' -print0 | xargs -0 sed -i -E 's/ARG ANDROID_NDK=.*/ARG ANDROID_NDK=r21e/g'
+          find ./docker -type f -name 'Dockerfile.*' -print0 | xargs -0 sed -i -E 's/ARG ANDROID_SDK=.*/ARG ANDROID_SDK=23/g'
+          find ./docker -type f -name 'Dockerfile.*' -print0 | xargs -0 sed -i -E 's/ARG ANDROID_VERSION=.*/ARG ANDROID_VERSION=6.0.1_r81/g'
+          grep 'ARG ANDROID_' ./docker/Dockerfile.*
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: ./cross/docker
+          file: ./cross/docker/Dockerfile.${{matrix.target}}
+          push: true
+          no-cache: true
+          #cache-from: type=gha
+          #cache-to: type=gha,mode=max
+          tags: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/indy-vdr-cross-${{matrix.target}}:latest
+          labels: ${{ steps.meta.outputs.labels }}
+

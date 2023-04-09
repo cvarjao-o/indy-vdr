@@ -1,4 +1,4 @@
-name: "Android"
+name: "Build-All"
 
 env:
   RUST_VERSION: "1.67.0"
@@ -6,6 +6,9 @@ env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_IMAGE_NAME: ${{ github.repository }}
   DOCKER_DEFAULT_PLATFORM: "linux/amd64"
+  ANDROID_NDK: "r13b"
+  ANDROID_SDK: "21"
+  ANDROID_VERSION: "5.0.0_r1"
 
 on:
   workflow_dispatch:
@@ -81,11 +84,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Checkout Cross
+        uses: actions/checkout@v3
+        with:
+          repository: cross-rs/cross
+          path: cross
+
+      - name: git patch (cross)
+        run: git apply ../patches/cross.patch
+        working-directory: ./cross
+
+      - name: Configure Android/NDK/SDK
+        working-directory: ./cross
+        run: |
+          find ./docker -type f -name 'Dockerfile.*' -print0 | xargs -0 sed -i -E 's/ARG ANDROID_NDK=.*/ARG ANDROID_NDK=${{env.ANDROID_NDK}}/g'
+          find ./docker -type f -name 'Dockerfile.*' -print0 | xargs -0 sed -i -E 's/ARG ANDROID_SDK=.*/ARG ANDROID_SDK=${{env.ANDROID_SDK}}/g'
+          find ./docker -type f -name 'Dockerfile.*' -print0 | xargs -0 sed -i -E 's/ARG ANDROID_VERSION=.*/ARG ANDROID_VERSION=${{env.ANDROID_VERSION}}/g'
+          grep 'ARG ANDROID_' ./docker/Dockerfile.*
+          grep 'libunwind.a' ./docker/android-system.sh || true
+
       - name: Setup Cross.toml
         run: |
-          cp Cross-ci.toml Cross.toml
-          echo '[target.aarch64-linux-android]' >> Cross.toml
-          echo 'image = "${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/indy-vdr-cross-${{matrix.target}}:latest"' >> Cross.toml
+          echo '[target.${{matrix.target}}.dockerfile]' > Cross.toml
+          echo 'file = "./cross/docker/Dockerfile.${{matrix.target}}"' >> Cross.toml
+          echo 'context = "./cross/docker" ' >> Cross.toml
+          echo 'build-args = { ANDROID_NDK = "${{env.ANDROID_NDK}}", ANDROID_SDK = "${{env.ANDROID_SDK}}", ANDROID_VERSION="${{env.ANDROID_VERSION}}" }' >> Cross.toml
           cat Cross.toml
 
       - name: Setup Cross
@@ -94,23 +117,13 @@ jobs:
 
       - name: Cross Build
         run: |
-          cross build -vv --release --target ${{matrix.target}} --package indy-vdr
+          cross build -vvvvv --release --target ${{matrix.target}} --package indy-vdr
 
       - name: Save library
         uses: actions/upload-artifact@v3
         with:
           name: ${{matrix.target}}
           path: target/${{ matrix.target }}/release/libindy_vdr.so
-
-#      - uses: actions/setup-java@v3
-#        with:
-#          java-version: '17'
-#          distribution: 'temurin'
-#
-#      - name: Run mvn deploy
-#        run: mvn --batch-mode deploy:deploy-file --define "url=https://maven.pkg.github.com/${{github.repository}}" --define "repositoryId=github" --define "generatePom=false" --define "file=target/${{ matrix.target }}/release/libindy_vdr.so" --define "groupId=com.github.${{github.repository_owner}}" --define "artifactId=libindy_vdr" --define "version=0.0.1-SNAPSHOT" --define "classifier=${{ matrix.target }}"
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   publish:
     name: Publish libraries
     needs: [build-android]
@@ -144,4 +157,3 @@ jobs:
           --define "types=so,so,so"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

@@ -1,0 +1,16 @@
+diff --git a/docker/android-system.sh b/docker/android-system.sh
+index 412758f..2a97e9a 100755
+--- a/docker/android-system.sh
++++ b/docker/android-system.sh
+@@ -137,6 +137,11 @@ main() {
+     rm -rf "${td}"
+     rm -rf "${PYTHON_TMPDIR}"
+     rm "${0}"
++    # workaround
++    # https://blog.rust-lang.org/2023/01/09/android-ndk-update-r25.html
++    # https://github.com/rust-lang/rust/pull/85806#issuecomment-1096266946
++    find / -name 'libunwind.a' | sed 's@libunwind.a$@libgcc.a@' | while read x; do echo "INPUT(-lunwind)" > $x; echo "Patched $x"; done
++    apt-get install --assume-yes --no-install-recommends libncurses5
+ }
+ 
+ # java isn't required for the build, but the build expects to
