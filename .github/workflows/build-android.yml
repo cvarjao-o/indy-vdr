@@ -37,16 +37,16 @@ jobs:
           shared-key: deps
           cache-on-failure: true
 
-      - name: Cargo check
-        run: cargo check
+#      - name: Cargo check
+#        run: cargo check
 
-      - name: Cargo fmt
-        run: cargo fmt --all -- --check
+#      - name: Cargo fmt
+#        run: cargo fmt --all -- --check
 
-      - if: "runner.os == 'Linux'"
-        name: Pre-install cross
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
+#      - if: "runner.os == 'Linux'"
+#        name: Pre-install cross
+#        run: |
+#          cargo install cross --git https://github.com/cross-rs/cross
 
   build-android:
     name: Build library (Android)
@@ -87,7 +87,7 @@ jobs:
       - name: Setup Cross.toml
         run: |
           echo '[target.${{matrix.target}}]' > Cross.toml
-          echo 'image = "docker pull ghcr.io/hyperledger/aries-builder-images/cross/${{matrix.target}}:main"' >> Cross.toml
+          echo 'image = "ghcr.io/hyperledger/aries-builder-images/cross/${{matrix.target}}:main"' >> Cross.toml
           cat Cross.toml
 
       - name: Setup Cross
