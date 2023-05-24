@@ -6,6 +6,9 @@ env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_IMAGE_NAME: ${{ github.repository }}
   DOCKER_DEFAULT_PLATFORM: "linux/amd64"
+  ANDROID_NDK: "r13b"
+  ANDROID_SDK: "21"
+  ANDROID_VERSION: "5.0.0_r1"
 
 on:
   workflow_dispatch:
@@ -83,9 +86,8 @@ jobs:
 
       - name: Setup Cross.toml
         run: |
-          cp Cross-ci.toml Cross.toml
-          echo '[target.aarch64-linux-android]' >> Cross.toml
-          echo 'image = "${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/indy-vdr-cross-${{matrix.target}}:latest"' >> Cross.toml
+          echo '[target.${{matrix.target}}]' > Cross.toml
+          echo 'image = "docker pull ghcr.io/hyperledger/aries-builder-images/cross/${{matrix.target}}:main"' >> Cross.toml
           cat Cross.toml
 
       - name: Setup Cross
@@ -94,23 +96,13 @@ jobs:
 
       - name: Cross Build
         run: |
-          cross build -vv --release --target ${{matrix.target}} --package indy-vdr
+          cross build -vvvvv --release --target ${{matrix.target}} --package indy-vdr
 
       - name: Save library
         uses: actions/upload-artifact@v3
         with:
           name: ${{matrix.target}}
           path: target/${{ matrix.target }}/release/libindy_vdr.so
-
-#      - uses: actions/setup-java@v3
-#        with:
-#          java-version: '17'
-#          distribution: 'temurin'
-#
-#      - name: Run mvn deploy
-#        run: mvn --batch-mode deploy:deploy-file --define "url=https://maven.pkg.github.com/${{github.repository}}" --define "repositoryId=github" --define "generatePom=false" --define "file=target/${{ matrix.target }}/release/libindy_vdr.so" --define "groupId=com.github.${{github.repository_owner}}" --define "artifactId=libindy_vdr" --define "version=0.0.1-SNAPSHOT" --define "classifier=${{ matrix.target }}"
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   publish:
     name: Publish libraries
     needs: [build-android]
@@ -144,4 +136,3 @@ jobs:
           --define "types=so,so,so"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
