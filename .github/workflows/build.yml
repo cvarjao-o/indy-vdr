@@ -546,3 +546,50 @@ jobs:
         run: |
           twine upload --skip-existing dist/*
         working-directory: wrappers/python
+  publish:
+    name: Publish libraries
+    needs:
+      - create-ios-xcframework
+      - create-android-library
+    runs-on: ubuntu-20.04
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Fetch Android libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: android-libraries
+          path: mobile/android/
+      - name: Fetch iOS Framework
+        uses: actions/download-artifact@v4
+        with:
+          name: indy_vdr.xcframework
+          path: mobile/ios/
+      - uses: a7ul/tar-action@v1.2.0
+        with:
+          command: c
+          files: ./mobile
+          outPath: "library-ios-android.tar.gz"
+      - name: Show Working directory files
+        run: ls -laR
+      - name: Publish to GitHub Packages registry
+        if: false
+        run: |
+          mvn --batch-mode deploy:deploy-file \
+          --define "url=https://maven.pkg.github.com/${{github.repository}}" \
+          --define "repositoryId=github" \
+          --define "generatePom=false" \
+          --define "groupId=com.github.${{github.repository_owner}}" \
+          --define "artifactId=libindy_vdr" \
+          --define "version=0.0.${{github.run_number}}-${{github.run_attempt}}" \
+          --define "file=target/aarch64-linux-android/libindy_vdr.so" \
+          --define "classifier=aarch64-linux-android" \
+          --define "files=target/armv7-linux-androideabi/libindy_vdr.so,target/i686-linux-android/libindy_vdr.so,target/x86_64-linux-android/libindy_vdr.so" \
+          --define "classifiers=armv7-linux-androideabi,i686-linux-android,x86_64-linux-android" \
+          --define "types=so,so,so"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
